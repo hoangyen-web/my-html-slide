@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grammar Galaxy Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        function adjustFontSize() {
+            const screenWidth = window.innerWidth;
+            const htmlElement = document.documentElement;
+
+            if (screenWidth <= 768) {
+                htmlElement.style.fontSize = '20px';
+            } else {
+                const scaleFactor = screenWidth / 1680;
+                const fontSize = Math.max(20, Math.min(30, 30 * scaleFactor));
+                htmlElement.style.fontSize = `${fontSize}px`;
+            }
+        }
+
+        function showZoomInstructions() {
+            if (window.innerWidth <= 768) return;
+            if (localStorage.getItem('hideZoomInstructions')) return;
+
+            const popup = document.createElement('div');
+            popup.style.cssText = `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95);
+            background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            z-index: 1000; max-width: 90%; width: 400px; opacity: 0; transition: all 0.3s ease;`;
+
+            popup.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 15px;">
+                        <path d="M15 3H21V9" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M9 21H3V15" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M21 3L14 10" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M3 21L10 14" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 25px; font-weight: 600;">
+                        Hướng dẫn phóng to/thu nhỏ</h3>
+                </div>
+                <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0; color: #4b5563; font-size: 20px; line-height: 1.6;">
+                        Bạn có thể sử dụng tổ hợp phím sau để phóng to/thu nhỏ nội dung cho phù hợp với màn hình của bạn:
+                    </p>
+                    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 20px; color: #374151;">Windows</span>
+                            <span style="color: #4b5563;">Ctrl + (+/-)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 20px; color: #374151;">Mac</span>
+                            <span style="color: #4b5563;">Command + (+/-)</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="dismissPopup" style="background: #4f46e5; color: white; padding: 10px 20px; border-radius: 8px;
+                border: none; cursor: pointer; width: 100%; font-size: 15px; font-weight: 500; transition: background-color 0.2s ease;">
+                Không hiển thị lại</button>
+            `;
+
+            document.body.appendChild(popup);
+
+            requestAnimationFrame(() => {
+                popup.style.transform = 'translate(-50%, -50%) scale(1)';
+                popup.style.opacity = '1';
+            });
+
+            const button = document.getElementById('dismissPopup');
+            button.addEventListener('mouseover', () => button.style.backgroundColor = '#4338ca');
+            button.addEventListener('mouseout', () => button.style.backgroundColor = '#4f46e5');
+            button.addEventListener('click', () => {
+                popup.style.transform = 'translate(-50%, -50%) scale(0.95)';
+                popup.style.opacity = '0';
+                setTimeout(() => {
+                    localStorage.setItem('hideZoomInstructions', 'true');
+                    popup.remove();
+                }, 300);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            adjustFontSize();
+            showZoomInstructions();
+        });
+        window.addEventListener('resize', adjustFontSize);
+
+        function checkMC(radio) {
+            const questionDiv = radio.closest('[data-answer]');
+            const correctAnswer = questionDiv.dataset.answer;
+            const allLabels = questionDiv.querySelectorAll('label');
+
+            // Reset all labels for this question
+            allLabels.forEach(label => {
+                label.classList.remove('text-green-600', 'font-bold', 'text-red-600');
+            });
+
+            if (radio.value === correctAnswer) {
+                radio.parentElement.classList.add('text-green-600', 'font-bold');
+            } else {
+                radio.parentElement.classList.add('text-red-600', 'font-bold');
+                // Also show the correct one
+                const correctLabel = questionDiv.querySelector(`input[value="${correctAnswer}"]`).parentElement;
+                correctLabel.classList.add('text-green-600', 'font-bold');
+            }
+        }
+
+        function submitAnswers() {
+            // Check all MCQs
+            const mcQuestions = document.querySelectorAll('div[data-answer]');
+            mcQuestions.forEach(q => {
+                const checkedRadio = q.querySelector('input[type="radio"]:checked');
+                if (checkedRadio) {
+                    checkMC(checkedRadio);
+                }
+            });
+
+            // Check all text inputs
+            const textInputs = document.querySelectorAll('input[type="text"][data-answer]');
+            textInputs.forEach(input => {
+                const normalize = (str) => str.trim().toLowerCase().replace(/[.,!?;:]/g, '').replace(/\s+/g, ' ');
+                const userAnswer = normalize(input.value);
+                const correctAnswer = normalize(input.dataset.answer);
+                
+                input.classList.remove('border-green-500', 'text-green-600', 'border-red-500');
+
+                if (userAnswer === correctAnswer) {
+                    input.classList.add('border-green-500', 'text-green-600');
+                } 
+            });
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-indigo-700 mb-2">Grammar Galaxy Explorer 🚀</h1>
+            <p class="text-gray-600">Master English grammar through interactive exercises</p>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-indigo-600 mb-4">Complex Sentences with Adverb Clauses of Time</h2>
+            <h3 class="text-lg font-medium text-gray-700 mb-2">(Câu phức với mệnh đề trạng ngữ chỉ thời gian)</h3>
+            
+            <div class="space-y-6">
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">a. Definition (Định nghĩa)</h4>
+                    <p class="text-gray-700 mb-2">A <strong>complex sentence</strong> contains one independent clause and at least one dependent clause.</p>
+                    <p class="text-gray-700">An <strong>adverb clause of time</strong> tells <em>when</em> something happens, usually beginning with time connectors like:</p>
+                    <p class="bg-indigo-50 p-3 rounded mt-2 text-indigo-800"><strong>before, after, when, while, till/until, as soon as, ...</strong></p>
+                    <p class="text-gray-700 mt-2"><strong>Example:</strong> The roads were slippery <strong>when it rained</strong>.</p>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">b. Common Time Connectors</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border border-gray-200">
+                            <thead class="bg-indigo-50">
+                                <tr>
+                                    <th class="py-2 px-4 border-b">Connector</th>
+                                    <th class="py-2 px-4 border-b">Meaning</th>
+                                    <th class="py-2 px-4 border-b">Example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="py-2 px-4 border-b">When</td>
+                                    <td class="py-2 px-4 border-b">Khi, vào lúc</td>
+                                    <td class="py-2 px-4 border-b">I saw him when I was walking down the street.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-4 border-b">While</td>
+                                    <td class="py-2 px-4 border-b">Trong khi</td>
+                                    <td class="py-2 px-4 border-b">Don't use too much water while you are having a shower.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-4 border-b">Before</td>
+                                    <td class="py-2 px-4 border-b">Trước khi</td>
+                                    <td class="py-2 px-4 border-b">You must wash your hands before you eat.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-4 border-b">After</td>
+                                    <td class="py-2 px-4 border-b">Sau khi</td>
+                                    <td class="py-2 px-4 border-b">We will clean up after we finish our picnic.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-4 border-b">As soon as</td>
+                                    <td class="py-2 px-4 border-b">Ngay khi</td>
+                                    <td class="py-2 px-4 border-b">As soon as we arrive, we will visit the park.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-4 border-b">Till/Until</td>
+                                    <td class="py-2 px-4 border-b">Cho đến khi</td>
+                                    <td class="py-2 px-4 border-b">We should stay here until the rain stops.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">c. Important Notes</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <h5 class="font-medium text-gray-700 mb-1">1. Clause Position</h5>
+                            <p class="text-gray-700">The adverb clause can come <strong>before</strong> or <strong>after</strong> the main clause.</p>
+                            <p class="text-gray-700">If it comes <strong>first</strong>, use a <strong>comma</strong> to separate the clauses.</p>
+                            <div class="bg-gray-50 p-3 rounded mt-2">
+                                <p class="text-green-600"><strong>Correct:</strong> <em>When I saw the trash, I picked it up.</em> (comma used)</p>
+                                <p class="text-green-600"><strong>Correct:</strong> <em>I picked up the trash when I saw it.</em> (no comma)</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h5 class="font-medium text-gray-700 mb-1">2. Tense Usage</h5>
+                            <p class="text-gray-700">In adverb clauses about the <strong>future</strong>, use <strong>Present Simple</strong>, NOT future tense.</p>
+                            <div class="bg-gray-50 p-3 rounded mt-2">
+                                <p class="text-red-600"><strong>Wrong:</strong> When I <strong>will arrive</strong>, I will call you.</p>
+                                <p class="text-green-600"><strong>Correct:</strong> When I <strong>arrive</strong>, I will call you.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">d. Common Mistakes</h4>
+                    <div class="space-y-2">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-5 w-5 text-red-500 mt-1">✗</div>
+                            <div>
+                                <p class="text-gray-700"><strong>Forgetting commas:</strong> Before you leave turn off the lights.</p>
+                                <p class="text-green-600">✓ Before you leave, turn off the lights.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-5 w-5 text-red-500 mt-1">✗</div>
+                            <div>
+                                <p class="text-gray-700"><strong>Wrong tense:</strong> I will tell him as soon as I <strong>will see</strong> him.</p>
+                                <p class="text-green-600">✓ I will tell him as soon as I <strong>see</strong> him.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form id="testForm">
+            <!-- Multiple Choice -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold text-indigo-600 mb-4 flex items-center">
+                    <i class="fas fa-list-ol mr-2"></i> Exercise 1: Multiple Choice (5 questions)
+                </h2>
+                
+                <div class="space-y-4">
+                    <div data-answer="a">
+                        <p class="mb-2">1. ______ I finish my homework, I will watch TV.</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc1" value="a" class="mr-2" onclick="checkMC(this)"> a. When
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc1" value="b" class="mr-2" onclick="checkMC(this)"> b. While
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc1" value="c" class="mr-2" onclick="checkMC(this)"> c. Until
+                            </label>
+                        </div>
+                    </div>
+
+                    <div data-answer="c">
+                        <p class="mb-2">2. She was cooking dinner ______ the phone rang.</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc2" value="a" class="mr-2" onclick="checkMC(this)"> a. before
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc2" value="b" class="mr-2" onclick="checkMC(this)"> b. while
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc2" value="c" class="mr-2" onclick="checkMC(this)"> c. when
+                            </label>
+                        </div>
+                    </div>
+
+                    <div data-answer="a">
+                        <p class="mb-2">3. ______ you see him, tell him to call me.</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc3" value="a" class="mr-2" onclick="checkMC(this)"> a. As soon as
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc3" value="b" class="mr-2" onclick="checkMC(this)"> b. While
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc3" value="c" class="mr-2" onclick="checkMC(this)"> c. Until
+                            </label>
+                        </div>
+                    </div>
+
+                    <div data-answer="b">
+                        <p class="mb-2">4. I'll wait here ______ you come back.</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc4" value="a" class="mr-2" onclick="checkMC(this)"> a. when
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc4" value="b" class="mr-2" onclick="checkMC(this)"> b. until
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc4" value="c" class="mr-2" onclick="checkMC(this)"> c. after
+                            </label>
+                        </div>
+                    </div>
+
+                    <div data-answer="b">
+                        <p class="mb-2">5. ______ I was reading, my brother was playing games.</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc5" value="a" class="mr-2" onclick="checkMC(this)"> a. Before
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc5" value="b" class="mr-2" onclick="checkMC(this)"> b. While
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="mc5" value="c" class="mr-2" onclick="checkMC(this)"> c. After
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sentence Rearrangement -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold text-indigo-600 mb-4 flex items-center">
+                    <i class="fas fa-random mr-2"></i> Exercise 2: Rearrange Sentences (5 questions)
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <p class="mb-2">1. the movie / started / when / we arrived / had already</p>
+                        <input type="text" name="rearrange1" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Write the correct order" data-answer="The movie had already started when we arrived." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">2. will call / I / as soon as / you / arrive / I</p>
+                        <input type="text" name="rearrange2" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Write the correct order" data-answer="I will call you as soon as I arrive." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">3. was cooking / while / she / dinner / the phone rang</p>
+                        <input type="text" name="rearrange3" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Write the correct order" data-answer="While she was cooking dinner, the phone rang." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">4. you leave / turn off / before / the lights</p>
+                        <input type="text" name="rearrange4" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Write the correct order" data-answer="Turn off the lights before you leave." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">5. the rain stops / we / until / should stay / here</p>
+                        <input type="text" name="rearrange5" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Write the correct order" data-answer="We should stay here until the rain stops." autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complex Sentences -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold text-indigo-600 mb-4 flex items-center">
+                    <i class="fas fa-puzzle-piece mr-2"></i> Exercise 3: Complex Sentences (5 questions)
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <p class="mb-2">1. I will call you. I will arrive at the station. (when)</p>
+                        <input type="text" name="complex1" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Combine using 'when'" data-answer="I will call you when I arrive at the station." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">2. She was cooking dinner. The phone rang. (while)</p>
+                        <input type="text" name="complex2" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Combine using 'while'" data-answer="She was cooking dinner while the phone rang." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">3. You finish your homework. You can watch TV. (after)</p>
+                        <input type="text" name="complex3" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Combine using 'after'" data-answer="After you finish your homework, you can watch TV." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">4. The rain stops. We will go out. (as soon as)</p>
+                        <input type="text" name="complex4" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Combine using 'as soon as'" data-answer="As soon as the rain stops, we will go out." autocomplete="off">
+                    </div>
+
+                    <div>
+                        <p class="mb-2">5. I was walking to school. I saw an accident. (when)</p>
+                        <input type="text" name="complex5" class="border border-gray-300 rounded px-3 py-2 w-full" placeholder="Combine using 'when'" data-answer="When I was walking to school, I saw an accident." autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="text-center mb-8">
+                <button type="button" id="submitBtn" onclick="submitAnswers()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center justify-center mx-auto">
+                    <i class="fas fa-paper-plane mr-2"></i> Submit Answers
+                </button>
+            </div>
+        </form>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-indigo-600 mb-4 flex items-center">
+                <i class="fas fa-chart-bar mr-2"></i> Your Results
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-indigo-50 p-4 rounded-lg text-center">
+                    <p class="text-sm text-indigo-600">Total Questions</p>
+                    <p class="text-2xl font-bold text-indigo-700" id="totalQuestions">15</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg text-center">
+                    <p class="text-sm text-green-600">Correct Answers</p>
+                    <p class="text-2xl font-bold text-green-700" id="correctAnswers">0</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg text-center">
+                    <p class="text-sm text-blue-600">Your Score</p>
+                    <p class="text-2xl font-bold text-blue-700" id="scorePercentage">0%</p>
+                </div>
+            </div>
+            
+            <div id="detailedResults" class="space-y-4">
+                <!-- Results will be inserted here by JavaScript -->
+            </div>
+            
+            <div class="mt-6 text-center">
+                <button id="tryAgainBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300 inline-flex items-center">
+                    <i class="fas fa-redo mr-2"></i> Try Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
